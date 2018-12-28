@@ -49,6 +49,8 @@ func wsend(conn net.Conn, data []byte) {
 	_, _ = conn.Write(data)
 }
 
+var CHANGE_SALT_NUM int = 300
+
 type AesAlg struct {
 	Salt     []byte
 	Key      []byte
@@ -56,19 +58,21 @@ type AesAlg struct {
 	Block    cipher.Block
 	Cbc      cipher.BlockMode //for decrypt
 	Ebc      cipher.BlockMode //for encrypt
+	Num      int
 	ConstKey string
 }
 
 func NewAesAlg(pwd []byte) *AesAlg {
 	obj := &AesAlg{}
+	obj.Num = 0
 	obj.Init(pwd)
 	return obj
 }
 
 func (this *AesAlg) Init(pwd []byte) {
-	this.ConstKey = "Salted__"
-	this.Salt = make([]byte, 8)
-	for i := 0; i < 8; i++ {
+	this.ConstKey = "Ym"
+	this.Salt = make([]byte, 4)
+	for i := 0; i < 4; i++ {
 		if i > len(pwd)-1 {
 			this.Salt[i] = 0
 		} else {
@@ -95,16 +99,26 @@ func (this *AesAlg) Encrypt(text []byte) []byte {
 	encrypted := make([]byte, len(pad))
 	this.Ebc.CryptBlocks(encrypted, pad)
 
-	return []byte(this.ConstKey + string(this.Salt) + string(encrypted))
+	flag := string([]byte{0})
+	this.Num++
+	if this.Num >= CHANGE_SALT_NUM {
+		this.Num = 0
+		flag = string([]byte{1})
+		newPwd := []byte(fmt.Sprintf("%v", RandUint(1000, 9999)))
+		this.Init(newPwd)
+	}
+
+	return []byte(this.ConstKey + flag + string(this.Salt) + string(encrypted))
 }
 
 // Decrypts encrypted text with the passphrase
 func (this *AesAlg) Decrypt(ct []byte) []byte {
-	if len(ct) < 16 || string(ct[:8]) != this.ConstKey {
+	constLen := len(this.ConstKey) + len(this.Salt)
+	if len(ct) < constLen || string(ct[:len(this.ConstKey)]) != this.ConstKey {
 		return nil
 	}
 
-	ct = ct[16:]
+	ct = ct[constLen:]
 
 	dst := make([]byte, len(ct))
 	this.Cbc.CryptBlocks(dst, ct)
