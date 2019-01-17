@@ -70,7 +70,7 @@ func NewAesAlg(pwd []byte) *AesAlg {
 }
 
 func (this *AesAlg) Init(pwd []byte) {
-	this.ConstKey = "Ym"
+	this.ConstKey = "Yd"
 	this.Salt = make([]byte, 4)
 	for i := 0; i < 4; i++ {
 		if i > len(pwd)-1 {
